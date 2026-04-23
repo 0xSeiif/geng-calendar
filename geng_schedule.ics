@@ -2,8 +2,8 @@ BEGIN:VCALENDAR
 VERSION:2.0
 PRODID:ics.py - http://git.io/lLljaA
 BEGIN:VEVENT
-DTSTART:20260423T120345Z
-SUMMARY:Bot Gen.G Opérationnel - En attente de matchs
-UID:e3e2d22c-1557-44ab-983f-c34911bdfecb@e3e2.org
+DTSTART:20260423T120743Z
+SUMMARY:Bot en attente de nouveaux matchs
+UID:fca4be06-f511-4140-9be8-93c4e4b45914@fca4.org
 END:VEVENT
 END:VCALENDAR
