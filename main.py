@@ -12,7 +12,7 @@ def get_geng_matches():
         "tables": "MatchSchedule",
         "fields": "DateTime_UTC, Team1, Team2, BestOf, Tournament",
         # On cherche tous les matchs de 2026 (l'année actuelle)
-        "where": "(Team1 LIKE 'Gen.G%' OR Team2 LIKE 'Gen.G%') AND DateTime_UTC > '2026-01-01'",
+        "where": "(Team1 LIKE '%Gen.G%' OR Team2 LIKE '%Gen.G%') AND DateTime_UTC > '2026-01-01'",
         "order_by": "DateTime_UTC",
         "limit": "50"
     }
