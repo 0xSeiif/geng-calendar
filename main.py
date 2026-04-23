@@ -1,72 +1,73 @@
 import requests
+from bs4 import BeautifulSoup
 from ics import Calendar, Event
 import arrow
+import re
 
-def get_geng_matches():
-    # API officielle de LoL Esports (perspectives de Riot)
-    url = "https://esports-api.elisa.io/query" 
-    # Note : Riot utilise souvent des endpoints complexes, 
-    # une alternative stable est l'API de Strafe ou Liquipedia.
-    # Pour rester simple sans clé, on va utiliser l'API publique de "Abios" via un proxy.
-    
-    url = "https://pandascore.co/api/teams/gen-g/matches?filter[future]=true"
-    # ATTENTION : Si tu ne veux vraiment aucune clé, la meilleure source alternative 
-    # est de "scrapper" le site Liquipedia qui est la référence absolue.
-    
-    # Voici un code robuste qui utilise un flux RSS/JSON de tournois :
-    url = "https://raw.githubusercontent.com/LoL-Esports/calendar/main/data/leagues/lck.json"
-    
-    # Mais pour ne pas te perdre, essayons une version simplifiée de Liquipedia :
-    return [] # On va plutôt passer par un parseur HTML simple
-
-# Voici la version "Liquipedia" (très fiable pour Gen.G)
-def create_calendar():
-    c = Calendar()
-    
-    # On utilise un service qui transforme Liquipedia en JSON pour nous simplifier la vie
-    try:
-        # On cible la LCK sur Liquipedia
-        response = requests.get("https://api.liquipedia.net/api/v1/match", params={
-            "wiki": "leagueoflegends",
-            "conditions": "[[opponent1::Gen.G]] OR [[opponent2::Gen.G]]",
-            "limit": 50
-        })
-        # Note : Liquipedia demande une clé aussi désormais...
-    except:
-        pass
-
-    # REVENONS À LA SOLUTION LA PLUS SIMPLE : 
-    # On va corriger le script Leaguepedia car c'est le SEUL qui ne demande pas de clé.
-    # Le problème venait juste de la date ou du nom du tournoi.
-    
-    url = "https://lol.fandom.com/api.php"
-    params = {
-        "action": "cargoquery",
-        "format": "json",
-        "tables": "MatchSchedule",
-        "fields": "DateTime_UTC, Team1, Team2, BestOf, Tournament",
-        "where": "Team1 LIKE '%Gen.G%' OR Team2 LIKE '%Gen.G%'", # On enlève la date pour tester
-        "order_by": "DateTime_UTC DESC", # On prend les plus récents en premier
-        "limit": "20"
+def get_liquipedia_matches():
+    # On se fait passer pour un navigateur web pour ne pas être bloqué
+    url = "https://liquipedia.net/leagueoflegends/Gen.G_Esports/Played_Matches"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'Accept-Encoding': 'gzip, deflate'
     }
     
-    res = requests.get(url, params=params).json()
-    matches = res.get("cargoquery", [])
+    response = requests.get(url, headers=headers)
+    if response.status_code != 200:
+        return []
+
+    soup = BeautifulSoup(response.text, 'html.parser')
+    matches = []
+    
+    # On cherche les lignes de matchs dans les tableaux Liquipedia
+    rows = soup.find_all('tr')
+    
+    for row in rows:
+        cells = row.find_all('td')
+        if len(cells) >= 4:
+            try:
+                # Extraction des équipes
+                team1 = cells[0].get_text(strip=True)
+                team2 = cells[3].get_text(strip=True)
+                
+                # Extraction de la date
+                date_span = cells[2].find('span', class_='timer-object')
+                if date_span:
+                    timestamp = date_span.get('data-timestamp')
+                    if timestamp:
+                        match_time = arrow.get(int(timestamp))
+                        
+                        # On ne prend que les matchs futurs ou très récents
+                        if match_time > arrow.now().shift(days=-1):
+                            opponent = team2 if "Gen.G" in team1 else team1
+                            matches.append({
+                                'opponent': opponent,
+                                'time': match_time.datetime,
+                                'tournament': cells[4].get_text(strip=True) if len(cells) > 4 else "LCK"
+                            })
+            except:
+                continue
+    return matches
+
+def create_calendar():
+    matches = get_liquipedia_matches()
+    c = Calendar()
     
     if not matches:
+        # Événement de test pour confirmer que le bot a tourné
         e = Event()
-        e.name = "Bot en attente de nouveaux matchs"
+        e.name = "Bot Liquipedia Connecté - Aucun match futur"
         e.begin = arrow.now().datetime
         c.events.add(e)
     else:
         for m in matches:
-            d = m["title"]
             e = Event()
-            e.name = f"Gen.G vs {d['Team2'] if 'Gen.G' in d['Team1'] else d['Team1']}"
-            e.begin = arrow.get(d["DateTime UTC"]).datetime
-            e.description = f"Tournoi: {d['Tournament']}"
+            e.name = f"Gen.G vs {m['opponent']}"
+            e.begin = m['time']
+            e.duration = {"hours": 3}
+            e.description = f"Source: Liquipedia\nTournoi: {m['tournament']}"
             c.events.add(e)
-
+            
     with open('geng_schedule.ics', 'w', encoding='utf-8') as f:
         f.writelines(c.serialize_iter())
 
