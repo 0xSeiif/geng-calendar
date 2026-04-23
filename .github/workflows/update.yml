@@ -1,1 +1,44 @@
+name: Update GenG Calendar
 
+on:
+  schedule:
+    # Cette ligne dit au bot de tourner tous les jours à minuit
+    - cron: '0 0 * * *'
+  # Cette ligne permet de lancer le bot manuellement quand tu veux tester
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    # Autorise le bot à modifier tes fichiers sur GitHub
+    permissions:
+      contents: write
+
+    steps:
+      # 1. Le bot récupère tes fichiers (main.py, etc.)
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. Le bot installe Python
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      # 3. Le bot installe les outils (ics, requests...)
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # 4. Le bot lance ton script main.py
+      - name: Run script
+        run: python main.py
+
+      # 5. Le bot enregistre les changements (le fichier .ics mis à jour)
+      - name: Commit and push changes
+        run: |
+          git config --global user.name 'GitHub Action Bot'
+          git config --global user.email 'action@github.com'
+          git add geng_schedule.ics
+          git commit -m "Update match schedules" || exit 0
+          git push
