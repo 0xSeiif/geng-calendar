@@ -1,31 +1,58 @@
-import os
 import requests
 from ics import Calendar, Event
 import arrow
 
-# On récupère la clé API que tu as cachée dans les paramètres GitHub
-API_KEY = os.getenv("PANDASCORE_API_KEY")
-TEAM_SLUG = "gen-g" 
+def get_geng_matches():
+    url = "https://lol.fandom.com/api.php"
+    
+    # On cherche "Gen.G" avec un joker (%) pour attraper "Gen.G Esports" ou "Gen.G"
+    params = {
+        "action": "cargoquery",
+        "format": "json",
+        "tables": "MatchSchedule",
+        "fields": "DateTime_UTC, Team1, Team2, BestOf, Tournament",
+        # On cherche tous les matchs de 2026 (l'année actuelle)
+        "where": "(Team1 LIKE 'Gen.G%' OR Team2 LIKE 'Gen.G%') AND DateTime_UTC > '2026-01-01'",
+        "order_by": "DateTime_UTC",
+        "limit": "50"
+    }
 
-def get_matches():
-    url = f"https://api.pandascore.co/teams/{TEAM_SLUG}/matches?filter[future]=true"
-    headers = {"Authorization": f"Bearer {API_KEY}"}
-    response = requests.get(url, headers=headers)
-    return response.json() if response.status_code == 200 else []
+    try:
+        response = requests.get(url, params=params)
+        data = response.json()
+        return data.get("cargoquery", [])
+    except Exception as e:
+        print(f"Erreur API : {e}")
+        return []
 
 def create_calendar():
-    matches = get_matches()
+    matches = get_geng_matches()
     c = Calendar()
     
-    for m in matches:
-        e = Event()
-        e.name = f"Gen.G vs {m['opponents'][0]['opponent']['name'] if m['opponents'] else 'TBD'}"
-        e.begin = arrow.get(m['scheduled_at']).datetime
-        e.description = f"Tournoi: {m['league']['name']}"
-        c.events.add(e)
+    if not matches:
+        print("Aucun match trouvé.")
+        # On crée un événement de test pour vérifier si l'import marche
+        e_test = Event()
+        e_test.name = "Bot Gen.G Opérationnel - En attente de matchs"
+        e_test.begin = arrow.now().datetime
+        c.events.add(e_test)
+    else:
+        for m in matches:
+            data = m["title"]
+            e = Event()
+            
+            t1 = data["Team1"]
+            t2 = data["Team2"]
+            opp = t2 if "Gen.G" in t1 else t1
+            
+            e.name = f"Gen.G vs {opp} (Bo{data['BestOf']})"
+            e.begin = arrow.get(data["DateTime UTC"]).datetime
+            e.duration = {"hours": 3}
+            e.description = f"Tournoi: {data['Tournament']}"
+            e.location = "Twitch.tv/LCK"
+            c.events.add(e)
     
-    # On crée le fichier final
-    with open('geng_schedule.ics', 'w') as f:
+    with open('geng_schedule.ics', 'w', encoding='utf-8') as f:
         f.writelines(c.serialize_iter())
 
 if __name__ == "__main__":
