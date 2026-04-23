@@ -32,9 +32,6 @@ jobs:
 
       # 4. Le bot lance ton script main.py
       - name: Run script
-        env:
-          # On donne au bot l'accès à ta clé API secrète
-          PANDASCORE_API_KEY: ${{ secrets.PANDASCORE_API_KEY }}
         run: python main.py
 
       # 5. Le bot enregistre les changements (le fichier .ics mis à jour)
